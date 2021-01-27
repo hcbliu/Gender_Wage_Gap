@@ -1,0 +1,1619 @@
+---
+title: "Final Project"
+author: "Hui-Chen Betty Liu"
+date: "December 6, 2019"
+output: html_document
+---
+
+### Problem Statement
+
+> Is there a significant difference in income between men and women? Does the difference vary depending on other factors (e.g., education, marital status, criminal history, drug use, childhood household factors, profession, etc.)?
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+# This section is for loading packages
+
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(kableExtra)
+options(scipen = 4)
+
+```
+
+
+### **(0)** Data cleaning and data exploration
+
+The original nlsy dataset used for this project has 12686 observations and 67 variables. The cleaned data set has 7024 obversations and 68 variables. This data cleaning process involved recoding all variables, adding new variables as well as those that are not meaningful in this context. 
+
+First, the observations that have missing values in the outcome variable (2012 income) are filtered out because the analyses require we have non-null values for the outcome variable. This reduced the number of observations to 7024. 
+
+All variables were renamed so that they are descriptive. For example, the variable representing gender was originally `R0214800` and is renamed `gender`.
+
+Many of the variables have negative values recorded, which represent different non-responses. For exmple, -5 represents "Non-interview". Rather than including these values as a negative numeric values, these non-responses were recoded as NA. Most variables have just negative numbers recoded as NA, while some have additional values coded as NA because I have decided they can be treated as NA in this context. An example is "not currently in the workforce" for the question about occupation. Sometimes, non-response are recoded because they are meaningful. An example is the use of cocaine. A respondent who refuses to report their drug use or says "I don't know" is different from the non-reponses representing respondents who were not given the question. 
+
+Numerical variables that have values representing qualitative responses were recoded as categorical variables. The values were reordered in a way that makes sense in this context. For example, for levels of education, the values are re-ordered from lowest to highest level of education. For a few variables, such as education and religion, new variables were created that have binned values such as "completed high school" and "Christian" (collapsing different Christian denominations). Two of the family values survey questions were recoded to reflect a general "misogynist scale". The higher the ratings, the more likely that the respondent is misogynist and reflects attitudes that widen the difference betwen men and women.
+
+Very few (only 5) variables were dropped. These variables, such as `version`, were dropped from the cleaned dataset because they are not meaningful in this context and are not used in the analysis to answer the research question. The reason for dropping each variable is included below: 
+
+- `version` was dropped because it's the same (445) for every respondent.
+- `age14.south` was dropped because the interpretation is unclear. It's unclear if "Yes" means reside in the south at age 14 or not.
+- `income2012x` was dropped because the information is already captured by `income2012` and because it only has 64 observations.
+- `income2012y` was dropped because the information is already captured by `income2012` and because it only has 64 observations.
+- `spouse.income2012r` was dropped because the information is already captured by `spouse.income2012` and because it only has 54 observations.
+
+A couple new variables were created. `age.spouse` was created to capture information about the spouse's age using values from `partner.birthyear`. The variable `income.topcoded` was created to label the top 2% income earners whose values in the outcome variable were recorded as $343,830, which is the average income of the top 2% income earners in the data set. This variable is then used to create a filtered data set that most of the analyses are based on. Throughout the analyses, I will check to see if the inclusion of the topcoded values change the conclusions of the analyses. For reference, the data frames `nlsydata4` and `nlsydata3` are identical except for this difference. `nlsydata4` filters out the topcoded income earners (which contains 143 respondents, with a high proportion of men). `nlsydata3` contains the topcoded respondents.
+
+
+
+```{r}
+# This section is for loading the nlsy data and some basic data cleaning
+
+nlsydata <- read_csv("http://www.andrew.cmu.edu/user/achoulde/94842/final_project/nlsy79/nlsy79_income.csv")
+
+# Rename all the variables so that they are descriptive.
+
+nlsydata1 <- nlsydata %>% 
+  rename(version = A0002500, 
+         respondent.id = R0000100,
+         us.born = R0000700, 
+         usborn.south = R0001010, 
+         multilingual = R0001100, 
+         language = R0001200, 
+         age14.south = R0001610, 
+         age14.urban = R0001800, 
+         religion = R0010300, 
+         education1979 = R0023500, 
+         veteran = R0029100, 
+         fa.womenathome = R0153800, 
+         fa.notimetowork = R0153900, 
+         fa.proworkwife = R0154000, 
+         fa.badchildren = R0154100, 
+         fa.genderrole = R0154300, 
+         fa.menhousework = R0154400, 
+         fa.happytradrole = R0154500, 
+         ideal.occupation = R0170100, 
+         schoolin5years = R0171800, 
+         race = R0214700, 
+         gender = R0214800, 
+         marital.status1979 = R0217501, 
+         familysize1979 = R0217502, 
+         poverty1979 = R0217910, 
+         police.frisk = R0306700, 
+         age.1stfrisk= R0307000, 
+         crime.charge = R0307100, 
+         age.1stalcohol = R1021700, 
+         marijuana = R1395100, 
+         age.1stmarijuana = R1395400, 
+         income1990 = R3279401, 
+         poverty1990 = R3400800, 
+         education1990 = R3401501, 
+         jobs.held1990 = R3403500, 
+         nonbio.children = R3407700, 
+         age.nonbiokid = R3407800, 
+         cocaine1990 = R6430800, 
+         age.1stcocaine = R6430900, 
+         industry2000 = R6591300, 
+         occupation2000 = R6592900, 
+         spouse.occupation2000 = R6738700, 
+         spouse.workhours2000 = R6749800, 
+         number.children = R6839600, 
+         income2000 = R6909701, 
+         familysize2000 = R7006400, 
+         household.income1999 = R7006500, 
+         poverty2000 = R7006600, 
+         maritalc.status2000 = R7006900, 
+         marital.status2000 = R7007000, 
+         months.marryto1stkid= R9909700, 
+         partner.birthyear = T3206901, 
+         industry2012 = T3308200, 
+         occupation2012 = T3308700, 
+         spouse.occupation2012 = T3495400, 
+         spouse.workhours2012 = T3506500, 
+         alcohol.dailyconsume = T3976400, 
+         income2012= T3977400, 
+         income2012x = T3977500, 
+         income2012y= T3977600, 
+         spouse.income2012 = T3987600, 
+         spouse.income2012r= T3987800, 
+         familysize2012= T4112200, 
+         us.region = T4112700, 
+         education2012 = T4113000, 
+         urban.residence = T4114600, 
+         jobs.held2012 = T4114900)
+```
+
+```{r}
+# Clean income data in nlsydata1 by making a new data frame that contains only rows that have 0 or greater values in the outcome variable, since negative numbers means NA in this context.
+
+#nlsydata is the original data set, with untouched raw data
+#nlsydata1 has renamed variables
+#nlsydata2 filters the data to contain only the rows that have non-null values for the outcome variable income2012. It reduces the number of observations (number of rows) from 12686 tp 7024 observations.
+#nlsyda3 further cleans the data. Various non-response values are recoded as NA. Factor variables are given descriptive names and then reordered.
+
+nlsydata2 <- mutate(filter(nlsydata1, 
+       income2012 >= 0) %>%
+  select(everything()))
+
+nlsydata3 <- nlsydata2
+
+```
+
+
+```{r}
+#This section looks at each variable and recode non-response values as NA. Most variables have negative numbers recoded as NA, some have additional values coded as NA because I have decided they can be treated as NA in this context.
+
+
+nlsydata3$us.born[nlsydata3$us.born < 0] <- NA
+nlsydata3$usborn.south[nlsydata3$usborn.south < 0] <- NA
+nlsydata3$multilingual[nlsydata3$multilingual < 0] <- NA
+nlsydata3$language[nlsydata3$language < 0] <- NA
+nlsydata3$age14.urban[nlsydata3$age14.urban < 0] <- NA
+nlsydata3$religion[nlsydata3$religion < 0] <- NA
+nlsydata3$education1979[nlsydata3$education1979 < 0] <- NA
+nlsydata3$veteran[nlsydata3$veteran < 0] <- NA
+nlsydata3$fa.womenathome[nlsydata3$fa.womenathome < 0] <- NA
+nlsydata3$fa.notimetowork[nlsydata3$fa.notimetowork < 0] <- NA
+nlsydata3$fa.proworkwife[nlsydata3$fa.proworkwife < 0] <- NA
+nlsydata3$fa.badchildren[nlsydata3$fa.badchildren < 0] <- NA
+nlsydata3$fa.genderrole[nlsydata3$fa.genderrole < 0] <- NA
+nlsydata3$fa.menhousework[nlsydata3$fa.menhousework < 0] <- NA
+nlsydata3$fa.happytradrole[nlsydata3$fa.happytradrole < 0] <- NA
+nlsydata3$ideal.occupation[nlsydata3$ideal.occupation <= 0] <- NA
+nlsydata3$ideal.occupation[nlsydata3$ideal.occupation == 995] <- NA
+nlsydata3$schoolin5years[nlsydata3$schoolin5years < 0] <- NA
+nlsydata3$marital.status1979[nlsydata3$marital.status1979 < 0] <- NA
+nlsydata3$police.frisk[nlsydata3$police.frisk < 0] <- NA
+nlsydata3$age.1stfrisk[nlsydata3$age.1stfrisk < 0] <- NA
+nlsydata3$crime.charge[nlsydata3$crime.charge < 0] <- NA
+nlsydata3$age.1stalcohol[nlsydata3$age.1stalcohol < 0] <- NA
+nlsydata3$marijuana[nlsydata3$marijuana < 0] <- NA
+nlsydata3$age.1stmarijuana[nlsydata3$age.1stmarijuana < 0] <- NA
+nlsydata3$income1990[nlsydata3$income1990 < 0] <- NA
+nlsydata3$poverty1990[nlsydata3$poverty1990 < 0] <- NA
+nlsydata3$education1990[nlsydata3$education1990 < 0] <- NA
+nlsydata3$jobs.held1990[nlsydata3$jobs.held1990 < 0] <- NA
+nlsydata3$nonbio.children[nlsydata3$nonbio.children < 0] <- NA
+nlsydata3$age.nonbiokid[nlsydata3$age.nonbiokid < 0] <- NA
+nlsydata3$cocaine1990[nlsydata3$cocaine1990 == -5] <- NA
+nlsydata3$cocaine1990[nlsydata3$cocaine1990 == -4] <- NA
+nlsydata3$age.1stcocaine[nlsydata3$age.1stcocaine < 0] <- NA
+nlsydata3$industry2000[nlsydata3$industry2000 <= 0] <- NA
+nlsydata3$occupation2000[nlsydata3$occupation2000 <= 2] <- NA
+nlsydata3$occupation2000[nlsydata3$occupation2000 >= 890] <- NA
+nlsydata3$spouse.occupation2000[nlsydata3$spouse.occupation2000 < 0] <- NA
+nlsydata3$spouse.workhours2000[nlsydata3$spouse.workhours2000 < 0] <- NA
+nlsydata3$number.children[nlsydata3$number.children < 0] <- NA
+nlsydata3$income2000[nlsydata3$income2000 < 0] <- NA
+nlsydata3$familysize2000[nlsydata3$familysize2000 < 0] <- NA
+nlsydata3$household.income1999[nlsydata3$household.income1999 < 0] <- NA
+nlsydata3$poverty2000[nlsydata3$poverty2000 < 0] <- NA
+nlsydata3$maritalc.status2000[nlsydata3$maritalc.status2000 < 0] <- NA
+nlsydata3$marital.status2000[nlsydata3$marital.status2000 < 0] <- NA
+nlsydata3$months.marryto1stkid[nlsydata3$months.marryto1stkid == -999] <- NA
+nlsydata3$partner.birthyear[nlsydata3$partner.birthyear < 0] <- NA
+nlsydata3$industry2012[nlsydata3$industry2012 < 0] <- NA
+nlsydata3$industry2012[nlsydata3$industry2012 == 9950] <- NA
+nlsydata3$industry2012[nlsydata3$industry2012 == 9990] <- NA
+nlsydata3$occupation2012[nlsydata3$occupation2012 < 0] <- NA
+nlsydata3$occupation2012[nlsydata3$occupation2012 == 9950] <- NA
+nlsydata3$occupation2012[nlsydata3$occupation2012 == 9990] <- NA
+nlsydata3$spouse.occupation2012[nlsydata3$spouse.occupation2012 < 0] <- NA
+nlsydata3$spouse.occupation2012[nlsydata3$spouse.occupation2012 == 9950] <- NA
+nlsydata3$spouse.occupation2012[nlsydata3$spouse.occupation2012 == 9990] <- NA
+nlsydata3$spouse.workhours2012[nlsydata3$spouse.workhours2012 < 0] <- NA
+nlsydata3$alcohol.dailyconsume[nlsydata3$alcohol.dailyconsume < 0] <- NA
+nlsydata3$spouse.income2012[nlsydata3$spouse.income2012 < 0] <- NA
+nlsydata3$familysize2012[nlsydata3$familysize2012 < 0] <- NA
+nlsydata3$us.region[nlsydata3$us.region < 0] <- NA
+nlsydata3$education2012[nlsydata3$education2012 < 0] <- NA
+nlsydata3$urban.residence[nlsydata3$urban.residence < 0] <- NA
+nlsydata3$jobs.held2012[nlsydata3$jobs.held2012 < 0] <- NA
+
+
+```
+
+```{r}
+# This section is for recoding categorical variables and ordering the factors in a way that makes sense in this context. For example, for levels of education, the values are re-ordered from lowest to highest level of education. For a few variables, such as education and religion, new variables were created that have binned values such as "completed high school" and "Christian" (collapsing different Christian denominations). Two of the family values survey questions were recoded to reflect a general "misogynist scale". The higher the ratings, the more the respondent is likely to be misogynist and reflect attitudes that widen the difference betwen men and women.
+
+
+nlsydata3 <- mutate(nlsydata3, 
+                    us.born = recode_factor(us.born, 
+                    `1` = "US", 
+                    `2` = "Non-US"),
+                    usborn.south = recode_factor(usborn.south, 
+                    `0` = "Non-South", 
+                    `1` = "South"), 
+                    multilingual = recode_factor(multilingual, 
+                    `0` = "English", 
+                    `1` = "Multilingual"), 
+                    language = recode_factor(language, 
+                    `1` = "Spanish", 
+                    `2` = "French", 
+                    `3` = "German", 
+                    `4` = "Other"), 
+                    age14.urban = recode_factor(age14.urban, 
+                    `1` = "City", 
+                    `2` = "Country", 
+                    `3` = "Farm"), 
+                    religion = recode_factor(religion, 
+                    `0` = "No religion",
+                    `1` = "Protestant", 
+                    `2` = "Baptist", 
+                    `3` = "Episcopalian", 
+                    `4` = "Lutheran", 
+                    `5` = "Methodist", 
+                    `6` = "Presbyterian", 
+                    `7` = "Roman Catholic", 
+                    `8` = "Jewish", 
+                    `9` = "Other"), 
+                    christian = recode_factor(religion, 
+                    `No religion` = "Not Christian",
+                    `Jewish` = "Not Christian", 
+                    `Other` = "Not Christian",
+                    `Protestant` = "Christian", 
+                    `Baptist` = "Christian", 
+                    `Episcopalian` = "Christian", 
+                    `Lutheran` = "Christian", 
+                    `Methodist` = "Christian", 
+                    `Presbyterian` = "Christian", 
+                    `Roman Catholic` = "Roman Catholic"), 
+                    education1979 = recode_factor(education1979,
+                    `1` = "1st grade", 
+                    `2` = "2nd grade",
+                    `3` = "3rd grade", 
+                    `4` = "4th grade", 
+                    `5` = "5th grade", 
+                    `6` = "6th grade", 
+                    `7` = "7th grade", 
+                    `8` = "8th grade", 
+                    `9` = "9th grade", 
+                    `10` = "10th grade", 
+                    `11` = "11th grade", 
+                    `12` = "12th grade",
+                    `13` = "1st year college", 
+                    `14` = "2nd year college", 
+                    `15` = "3rd year college", 
+                    `16` = "4th year college", 
+                    `17` = "5th year college", 
+                    `18` = "6th+ year college"), 
+                    exp.edu1979 = recode_factor(education1979, 
+                    `1st grade` = "Some elementary", 
+                    `2nd grade` = "Some elementary",
+                    `3rd grade` = "Some elementary", 
+                    `4th grade` = "Some elementary", 
+                    `5th grade` = "Complete elementary", 
+                    `6th grade` = "Some middle school", 
+                    `7th grade` = "Some middle school", 
+                    `8th grade` = "Complete middle school", 
+                    `9th grade` = "Some high school", 
+                    `10th grade` = "Some high school", 
+                    `11th grade` = "Some high school", 
+                    `12th grade` = "Complete high school",
+                    `1st year college` = "Some college", 
+                    `2nd year college` = "Some college", 
+                    `3rd year college` = "Some college", 
+                    `4th year college` = "Complete college", 
+                    `5th year college` = "Complete college", 
+                    `6th+ year college` = "Complete college"), 
+                    veteran = recode_factor(veteran, 
+                    `0` = "Not veteran", 
+                    `1` = "Veteran"), 
+                    fa.proworkwife = recode_factor(fa.proworkwife, 
+                    `4` = 1, 
+                    `3` = 2, 
+                    `2` = 3, 
+                    `1` = 4), 
+                    fa.menhousework = recode_factor(fa.menhousework, 
+                    `4` = 1, 
+                    `3` = 2, 
+                    `2` = 3, 
+                    `1` = 4), 
+                    schoolin5years = recode_factor(schoolin5years, 
+                    `0` = "No", 
+                    `1` = "Yes"), 
+                    marital.status1979 = recode_factor(marital.status1979, 
+                    `0` = "Never Married", 
+                    `1` = "Married", 
+                    `2` = "Separated", 
+                    `3` = "Divorced", 
+                    `5` = "Remarried", 
+                    `6` = "Widowed"),
+                    gender = recode_factor(gender, 
+                    `1` = "Male", 
+                    `2` = "Female"), 
+                    race = recode_factor(race, 
+                    `3` = "Other", 
+                    `1` = "Hispanic", 
+                    `2` = "Black"), 
+                    poverty1979 = recode_factor(poverty1979, 
+                    `0` = "Not in Poverty", 
+                    `1` = "Poverty"), 
+                    police.frisk = recode_factor(police.frisk, 
+                    `0` = "Not Frisked",
+                    `1` = "Frisked"), 
+                    crime.charge = recode_factor(crime.charge, 
+                    `0` = "Never charged",
+                    `1` = "Charged"), 
+                    poverty1990 = recode_factor(poverty1990, 
+                    `0` = "Not in Poverty", 
+                    `1` = "Poverty"), 
+                    education1990 = recode_factor(education1990,
+                    `1` = "1st grade", 
+                    `2` = "2nd grade",
+                    `3` = "3rd grade", 
+                    `4` = "4th grade", 
+                    `5` = "5th grade", 
+                    `6` = "6th grade", 
+                    `7` = "7th grade", 
+                    `8` = "8th grade", 
+                    `9` = "9th grade", 
+                    `10` = "10th grade", 
+                    `11` = "11th grade", 
+                    `12` = "12th grade",
+                    `13` = "1st year college", 
+                    `14` = "2nd year college", 
+                    `15` = "3rd year college", 
+                    `16` = "4th year college", 
+                    `17` = "5th year college", 
+                    `18` = "6th year college", 
+                    `19` = "7th year college", 
+                    `20` = "8th + year college"), 
+                    edu.completedin1990 = recode_factor(education1990, 
+                    `No education` = "No education",
+                    `1st grade` = "Some elementary", 
+                    `2nd grade` = "Some elementary",
+                    `3rd grade` = "Some elementary", 
+                    `4th grade` = "Some elementary", 
+                    `5th grade` = "Complete elementary", 
+                    `6th grade` = "Some middle school", 
+                    `7th grade` = "Some middle school", 
+                    `8th grade` = "Complete middle school", 
+                    `9th grade` = "Some high school", 
+                    `10th grade` = "Some high school", 
+                    `11th grade` = "Some high school", 
+                    `12th grade` = "Complete high school",
+                    `1st year college` = "Some college", 
+                    `2nd year college` = "Some college", 
+                    `3rd year college` = "Some college", 
+                    `4th year college` = "Complete college", 
+                    `5th year college` = "Complete college", 
+                    `6th year college` = "Complete college", 
+                    `7th year college` = "Complete college", 
+                    `8th year college` = "Complete college"), 
+                    cocaine1990 = recode_factor(cocaine1990, 
+                    `0` = "Never", 
+                    `1` = "1-2 times", 
+                    `2` = "3-5 times", 
+                    `3` = "6-10 times", 
+                    `4` = "11-49 times", 
+                    `5` = "50-99 times", 
+                    `6` = "100 or more times", 
+                    `-1` = "Refuse to answer", 
+                    `-2` = "I don't know"), 
+                    poverty2000 = recode_factor(poverty2000, 
+                    `0` = "Not in Poverty", 
+                    `1` = "Poverty"), 
+                    maritalc.status2000 = recode_factor(maritalc.status2000, 
+                    `1` = "Never Married", 
+                    `2` = "Married, Spouse Present", 
+                    `3` = "Other"), 
+                    marital.status2000 = recode_factor(marital.status2000, 
+                    `0` = "Never Married", 
+                    `1` = "Married", 
+                    `2` = "Separated", 
+                    `3` = "Divorced", 
+                    `6` = "Widowed"), 
+                    us.region = recode_factor(us.region, 
+                    `3` = "South", 
+                    `1` = "Northeast", 
+                    `2` = "North Central", 
+                    `4` = "West"), 
+                    education2012 = recode_factor(education2012,
+                    `0` = "No education",
+                    `1` = "1st grade",
+                    `2` = "2nd grade",
+                    `3` = "3rd grade", 
+                    `4` = "4th grade", 
+                    `5` = "5th grade", 
+                    `6` = "6th grade", 
+                    `7` = "7th grade", 
+                    `8` = "8th grade", 
+                    `9` = "9th grade", 
+                    `10` = "10th grade", 
+                    `11` = "11th grade", 
+                    `12` = "12th grade",
+                    `13` = "1st year college", 
+                    `14` = "2nd year college", 
+                    `15` = "3rd year college", 
+                    `16` = "4th year college", 
+                    `17` = "5th year college", 
+                    `18` = "6th year college", 
+                    `19` = "7th year college", 
+                    `20` = "8th + year college"), 
+                    edu.completedin2012 = recode_factor(education2012, 
+                    `No education` = "No education", 
+                    `1st grade` = "Some elementary", 
+                    `2nd grade` = "Some elementary",
+                    `3rd grade` = "Some elementary", 
+                    `4th grade` = "Some elementary", 
+                    `5th grade` = "Complete elementary", 
+                    `6th grade` = "Some middle school", 
+                    `7th grade` = "Some middle school", 
+                    `8th grade` = "Complete middle school", 
+                    `9th grade` = "Some high school", 
+                    `10th grade` = "Some high school", 
+                    `11th grade` = "Some high school", 
+                    `12th grade` = "Complete high school",
+                    `1st year college` = "Some college", 
+                    `2nd year college` = "Some college", 
+                    `3rd year college` = "Some college", 
+                    `4th year college` = "Complete college", 
+                    `5th year college` = "Complete college", 
+                    `6th year college` = "Complete college", 
+                    `7th year college` = "Complete college", 
+                    `8th + year college` = "Complete college"), 
+                    urban.residence = recode_factor(urban.residence, 
+                    `1` = "Urban", 
+                    `0` = "Rural", 
+                    `2` = "Unknown"))
+```
+
+
+```{r}
+# This section continues to recode numerical values as categorical factors. It contains recoded variables with wider ranges of values, such as occupations and industries.
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(ideal.occupation = factor(case_when(
+    .$ideal.occupation >= 1 & .$ideal.occupation <= 195 ~ "Technical",
+    .$ideal.occupation >= 201 & .$ideal.occupation <= 245 ~ "Manager", 
+    .$ideal.occupation >= 260 & .$ideal.occupation <= 285 ~ "Sales",
+    .$ideal.occupation >= 301 & .$ideal.occupation <= 395 ~ "Clerical",
+    .$ideal.occupation >= 401 & .$ideal.occupation <= 575 ~ "Craftsman",
+    .$ideal.occupation >= 580 & .$ideal.occupation <= 590 ~ "Military",
+    .$ideal.occupation >= 601 & .$ideal.occupation <= 715 ~ "Operative",
+    .$ideal.occupation >= 740 & .$ideal.occupation <= 785 ~ "Laborer",
+    .$ideal.occupation >= 801 & .$ideal.occupation <= 802 ~ "Farm Manager",
+    .$ideal.occupation >= 821 & .$ideal.occupation <= 824 ~ "Farm Laborer",
+    .$ideal.occupation >= 901 & .$ideal.occupation <= 965 ~ "Service",
+    .$ideal.occupation >= 980 & .$ideal.occupation <= 984 ~ "Private Household")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(industry2000 = factor(case_when(
+    .$industry2000 >= 17 & .$industry2000 <= 28 ~ "Agriculture & Fisheries",
+    .$industry2000 >= 47 & .$industry2000 <= 57 ~ "Mining", 
+    .$industry2000 >= 67 & .$industry2000 <= 77 ~ "Construction",
+    .$industry2000 >= 107 & .$industry2000 <= 398 ~ "Manufacturing",
+    .$industry2000 >= 407 & .$industry2000 <= 479 ~ "Transportation & Public Utilities",
+    .$industry2000 >= 507 & .$industry2000 <= 698 ~ "Wholesale & Retail Trade",
+    .$industry2000 >= 707 & .$industry2000 <= 718 ~ "Finance & Real Estate",
+    .$industry2000 >= 727 & .$industry2000 <= 759 ~ "Repair Services",
+    .$industry2000 >= 769 & .$industry2000 <= 798 ~ "Personal Services",
+    .$industry2000 >= 807 & .$industry2000 <= 809 ~ "Entertainment & Recreation Services",
+    .$industry2000 >= 828 & .$industry2000 <= 897 ~ "Professional Services",
+    .$industry2000 >= 907 & .$industry2000 <= 937 ~ "Public Administration")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(occupation2000 = factor(case_when(
+    .$occupation2000 >= 3 & .$occupation2000 <= 199 ~ "Managerial & Professional",
+    .$occupation2000 >= 203 & .$occupation2000 <= 235 ~ "Technical", 
+    .$occupation2000 >= 243 & .$occupation2000 <= 285 ~ "Sales",
+    .$occupation2000 >= 303 & .$occupation2000 <= 389 ~ "Clerical & Administrative Support",
+    .$occupation2000 >= 403 & .$occupation2000 <= 469 ~ "Service",
+    .$occupation2000 >= 473 & .$occupation2000 <= 499 ~ "Farming & Fishing",
+    .$occupation2000 >= 503 & .$occupation2000 <= 699 ~ "Craft & Repair Services",
+    .$occupation2000 >= 703 & .$occupation2000 <= 799 ~ "Operators - Machine, Assemblers, Inspectors",
+    .$occupation2000 >= 803 & .$occupation2000 <= 859 ~ "Operators - Transportation, Material Moving",
+    .$occupation2000 >= 863 & .$occupation2000 <= 889 ~ "Operators - Handlers, Helpers, Laborers")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(spouse.occupation2000 = factor(case_when(
+    .$spouse.occupation2000 >= 1 & .$spouse.occupation2000 <= 195 ~ "Technical",
+    .$spouse.occupation2000 >= 201 & .$spouse.occupation2000 <= 245 ~ "Manager", 
+    .$spouse.occupation2000 >= 260 & .$spouse.occupation2000 <= 285 ~ "Sales",
+    .$spouse.occupation2000 >= 301 & .$spouse.occupation2000 <= 395 ~ "Clerical",
+    .$spouse.occupation2000 >= 401 & .$spouse.occupation2000 <= 575 ~ "Craftsman",
+    .$spouse.occupation2000 >= 580 & .$spouse.occupation2000 <= 590 ~ "Military",
+    .$spouse.occupation2000 >= 601 & .$spouse.occupation2000 <= 715 ~ "Operative",
+    .$spouse.occupation2000 >= 740 & .$spouse.occupation2000 <= 785 ~ "Laborer",
+    .$spouse.occupation2000 >= 801 & .$spouse.occupation2000 <= 802 ~ "Farm Manager",
+    .$spouse.occupation2000 >= 821 & .$spouse.occupation2000 <= 824 ~ "Farm Laborer",
+    .$spouse.occupation2000 >= 901 & .$spouse.occupation2000 <= 965 ~ "Service",
+    .$spouse.occupation2000 >= 980 & .$spouse.occupation2000 <= 984 ~ "Private Household")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(months.marryto1stkid = factor(case_when(
+    .$months.marryto1stkid == 0 ~ "Same month", 
+    .$months.marryto1stkid >= 1 & .$months.marryto1stkid <= 11 ~ "Within a year",
+    .$months.marryto1stkid >= 12 & .$months.marryto1stkid <= 23 ~ "2 years", 
+    .$months.marryto1stkid >= 24 & .$months.marryto1stkid <= 35 ~ "3 years",
+    .$months.marryto1stkid >= 36 & .$months.marryto1stkid <= 47 ~ "4 years",
+    .$months.marryto1stkid >= 48 & .$months.marryto1stkid <= 59 ~ "5 years",
+    .$months.marryto1stkid >= 60 & .$months.marryto1stkid <= 71 ~ "6 years",
+    .$months.marryto1stkid >= 72 & .$months.marryto1stkid <= 83 ~ "7 years",
+    .$months.marryto1stkid >= 84 & .$months.marryto1stkid <= 95 ~ "8 years",
+    .$months.marryto1stkid >= 96 & .$months.marryto1stkid <= 107 ~ "9 years",
+    .$spouse.occupation2000 >= 108 & .$months.marryto1stkid <= 119 ~ "10 years",
+    .$months.marryto1stkid >= 120 & .$months.marryto1stkid <= 131 ~ "11 years",
+    .$months.marryto1stkid >= 132 & .$months.marryto1stkid <= 143 ~ "12 years", 
+    .$months.marryto1stkid >= 144 & .$months.marryto1stkid <= 999 ~ "More than 12 years", 
+    .$months.marryto1stkid == -997 ~ "Never married", 
+    .$months.marryto1stkid == -998 ~ "No children")))
+
+nlsydata3 <- mutate(nlsydata3, 
+                    months.marryto1stkid = fct_relevel(months.marryto1stkid, 
+                    c("Same month", "Within a year", "2 years", "3 years", 
+                      "4 years","5 years", "6 years", "7 years", 
+                      "8 years", "9 years", "10 years", "11 years", "12 years", 
+                      "More than 12 years",
+                      "3 years", "Never married", "No children")))
+
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(industry2012 = factor(case_when(
+    .$industry2012 >= 170 & .$industry2012 <= 290 ~ "Agriculture & Fisheries",
+    .$industry2012 >= 370 & .$industry2012 <= 490 ~ "Mining", 
+    .$industry2012 >= 570 & .$industry2012 <= 690 ~ "Utilities",
+    .$industry2012 == 770 ~ "Construction",
+    .$industry2012 >= 1070 & .$industry2012 <= 3990 ~ "Manufacturing",
+    .$industry2012 >= 4070 & .$industry2012 <= 4590 ~ "Wholesale Trade",
+    .$industry2012 >= 4670 & .$industry2012 <= 5790 ~ "Retail Trade",
+    .$industry2012 >= 6070 & .$industry2012 <= 6390 ~ "Transportation & Warehousing", 
+    .$industry2012 >= 6470 & .$industry2012 <= 6780 ~ "Information",
+    .$industry2012 >= 6870 & .$industry2012 <= 6990 ~ "Finance & Insurance",
+    .$industry2012 >= 7070 & .$industry2012 <= 7190 ~ "Real Estate", 
+    .$industry2012 >= 7270 & .$industry2012 <= 7490 ~ "Professional, Scientific, and Technical Services",
+    .$industry2012 >= 7570 & .$industry2012 <= 7790 ~ "Management, Administrative and Support, and Waste Management Services",
+    .$industry2012 >= 7860 & .$industry2012 <= 7890 ~ "Educational Services",
+    .$industry2012 >= 7970 & .$industry2012 <= 8470 ~ "Healthcare and Social Assistance", 
+    .$industry2012 >= 8560 & .$industry2012 <= 8590 ~ "Arts, Entertainment, and Recreation", 
+    .$industry2012 >= 8660 & .$industry2012 <= 8690 ~ "Accomodation and Food Services", 
+    .$industry2012 >= 8770 & .$industry2012 <= 9290 ~ "Other Services", 
+    .$industry2012 >= 9370 & .$industry2012 <= 9870 ~ "Public Administration and Active Duty Military", 
+    .$industry2012 == 9890 ~ "Armed Forces")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(occupation2012 = factor(case_when(
+    .$occupation2012 >= 10 & .$occupation2012 <= 430 ~ "Executive & Administrative",
+    .$occupation2012 >= 500 & .$occupation2012 <= 950 ~ "Management", 
+    .$occupation2012 >= 1000 & .$occupation2012 <= 1240 ~ "Math and Computer Science",
+    .$occupation2012 >= 1300 & .$occupation2012 <= 1560 ~ "Engineers & Architects",
+    .$occupation2012 >= 1600 & .$occupation2012 <= 1760 ~ "Physical Scientists",
+    .$occupation2012 >= 1800 & .$occupation2012 <= 1860 ~ "Social Scientists",
+    .$occupation2012 >= 1900 & .$occupation2012 <= 1960 ~ "Life, Physical and Social Science Technicians",
+    .$occupation2012 >= 2000 & .$occupation2012 <= 2060 ~ "Counselors & Religious Workers",
+    .$occupation2012 >= 2100 & .$occupation2012 <= 2150 ~ "Lawyers, Judges and Legal Support Workers",
+    .$occupation2012 >= 2200 & .$occupation2012 <= 2340 ~ "Teachers",
+    .$occupation2012 >= 2400 & .$occupation2012 <= 2550 ~ "Education, Training and Library Workers",
+    .$occupation2012 >= 2600 & .$occupation2012 <= 2760 ~ "Entertainers and Performers, Sports and Related Workers",
+    .$occupation2012 >= 2800 & .$occupation2012 <= 2960 ~ "Media & Communication",
+    .$occupation2012 >= 3000 & .$occupation2012 <= 3260 ~ "Health Diagnosing and Treating Practioners",
+    .$occupation2012 >= 3300 & .$occupation2012 <= 3650 ~ "Healthcare Technical and Support",
+    .$occupation2012 >= 3700 & .$occupation2012 <= 3950 ~ "Protective Services",
+    .$occupation2012 >= 4000 & .$occupation2012 <= 4160 ~ "Food Preparation and Serving",
+    .$occupation2012 >= 4200 & .$occupation2012 <= 4250 ~ "Cleaning and Building Services", 
+    .$occupation2012 >= 4300 & .$occupation2012 <= 4430 ~ "Entertainment Attendants", 
+    .$occupation2012 >= 4500 & .$occupation2012 <= 4650 ~ "Personal Care & Service",
+    .$occupation2012 >= 4700 & .$occupation2012 <= 4960 ~ "Sales",
+    .$occupation2012 >= 5000 & .$occupation2012 <= 5930 ~ "Office and Administrative Support",
+    .$occupation2012 >= 6000 & .$occupation2012 <= 6130 ~ "Farming & Fisheries",
+    .$occupation2012 >= 6200 & .$occupation2012 <= 6940 ~ "Construction Trade & Extraction",
+    .$occupation2012 >= 7000 & .$occupation2012 <= 7620 ~ "Installation, Maintenance and Repairs", 
+    .$occupation2012 >= 7700 & .$occupation2012 <= 7750 ~ "Production and Preparation", 
+    .$occupation2012 >= 7800 & .$occupation2012 <= 7850 ~ "Food Preparation",
+    .$occupation2012 >= 7900 & .$occupation2012 <= 8960 ~ "Setters, Operators and Tenders",
+    .$occupation2012 >= 9000 & .$occupation2012 <= 9750 ~ "Transportation and Material Moving",
+    .$occupation2012 == 9840 ~ "Armed Forces")))
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(spouse.occupation2012 = factor(case_when(
+    .$spouse.occupation2012 >= 10 & .$spouse.occupation2012 <= 430 ~ "Executive & Administrative",
+    .$spouse.occupation2012 >= 500 & .$spouse.occupation2012 <= 950 ~ "Management", 
+    .$spouse.occupation2012 >= 1000 & .$spouse.occupation2012 <= 1240 ~ "Math and Computer Science",
+    .$spouse.occupation2012 >= 1300 & .$spouse.occupation2012 <= 1560 ~ "Engineers & Architects",
+    .$spouse.occupation2012 >= 1600 & .$spouse.occupation2012 <= 1760 ~ "Physical Scientists",
+    .$spouse.occupation2012 >= 1800 & .$spouse.occupation2012 <= 1860 ~ "Social Scientists",
+    .$spouse.occupation2012 >= 1900 & .$spouse.occupation2012 <= 1960 ~ "Life, Physical and Social Science Technicians",
+    .$spouse.occupation2012 >= 2000 & .$spouse.occupation2012 <= 2060 ~ "Counselors & Religious Workers",
+    .$spouse.occupation2012 >= 2100 & .$spouse.occupation2012 <= 2150 ~ "Lawyers, Judges and Legal Support Workers",
+    .$spouse.occupation2012 >= 2200 & .$spouse.occupation2012 <= 2340 ~ "Teachers",
+    .$spouse.occupation2012 >= 2400 & .$spouse.occupation2012 <= 2550 ~ "Education, Training and Library Workers",
+    .$spouse.occupation2012 >= 2600 & .$spouse.occupation2012 <= 2760 ~ "Entertainers and Performers, Sports and Related Workers",
+    .$spouse.occupation2012 >= 2800 & .$spouse.occupation2012 <= 2960 ~ "Media & Communication",
+    .$spouse.occupation2012 >= 3000 & .$spouse.occupation2012 <= 3260 ~ "Health Diagnosing and Treating Practioners",
+    .$spouse.occupation2012 >= 3300 & .$spouse.occupation2012 <= 3650 ~ "Healthcare Technical and Support",
+    .$spouse.occupation2012 >= 3700 & .$spouse.occupation2012 <= 3950 ~ "Protective Services",
+    .$spouse.occupation2012 >= 4000 & .$spouse.occupation2012 <= 4160 ~ "Food Preparation and Serving",
+    .$spouse.occupation2012 >= 4200 & .$spouse.occupation2012 <= 4250 ~ "Cleaning and Building Services", 
+    .$spouse.occupation2012 >= 4300 & .$spouse.occupation2012 <= 4430 ~ "Entertainment Attendants", 
+    .$spouse.occupation2012 == 4460 ~ "Funeral Related Occupations", 
+    .$spouse.occupation2012 >= 4500 & .$spouse.occupation2012 <= 4650 ~ "Personal Care & Service",
+    .$spouse.occupation2012 >= 4700 & .$spouse.occupation2012 <= 4960 ~ "Sales",
+    .$spouse.occupation2012 >= 5000 & .$spouse.occupation2012 <= 5930 ~ "Office and Administrative Support",
+    .$spouse.occupation2012 >= 6000 & .$spouse.occupation2012 <= 6130 ~ "Farming & Fisheries",
+    .$spouse.occupation2012 >= 6200 & .$spouse.occupation2012 <= 6940 ~ "Construction Trade & Extraction",
+    .$spouse.occupation2012 >= 7000 & .$spouse.occupation2012 <= 7620 ~ "Installation, Maintenance and Repairs", 
+    .$spouse.occupation2012 >= 7700 & .$spouse.occupation2012 <= 7750 ~ "Production and Preparation", 
+    .$spouse.occupation2012 >= 7800 & .$spouse.occupation2012 <= 7850 ~ "Food Preparation",
+    .$spouse.occupation2012 >= 7900 & .$spouse.occupation2012 <= 8960 ~ "Setters, Operators and Tenders",
+    .$spouse.occupation2012 >= 9000 & .$spouse.occupation2012 <= 9750 ~ "Transportation and Material Moving",
+    .$spouse.occupation2012 >= 9800 & .$spouse.occupation2012 <= 9830 ~ "Military Specific Operations",
+    .$spouse.occupation2012 == 9840 ~ "Armed Forces")))
+
+```
+
+
+```{r}
+# This section creates new variables, such as age.spouse to the capture spouse's age using values from partner.birthyear. It also contains the variable topcode which indicates whether or not the outcome variable (income2012) is topcoded (in the top 2 percents).
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(age.spouse = 2012 - partner.birthyear)
+
+nlsydata3 <- nlsydata3 %>% 
+   mutate(income.topcoded = ifelse(income2012 == 343830, "1", "0"))
+
+nlsydata3 <- mutate(nlsydata3, 
+                    income.topcoded = recode_factor(income.topcoded, 
+                    `0` = "Not topcoded", 
+                    `1` = "Top-coded"))
+
+```
+
+
+```{r}
+
+# This section contains variables that are dropped from this dataset because they are not meaningful in this context and are not used in the analysis to answer the research question. The reason for dropping each variable is included.
+
+# Drop version because it's the same (445) for every respondent.
+nlsydata3 <- subset(nlsydata3, select = -c(version))
+
+# Drop age14.south because the interpretation is unclear. Not sure if "Yes" means reside in the south at age 14 or not.
+nlsydata3 <- subset(nlsydata3, select = -c(age14.south))
+
+# Drop income2012x because the information is already captured by income2012 and because it only has 64 observations.
+nlsydata3 <- subset(nlsydata3, select = -c(income2012x))
+
+# Drop income2012y because the information is already captured by income2012 and because it only has 64 observations.
+nlsydata3 <- subset(nlsydata3, select = -c(income2012y))
+
+# Drop spouse.income2012r because the information is already captured by spouse.income2012 and because it only has 54 observations.
+nlsydata3 <- subset(nlsydata3, select = -c(spouse.income2012r))
+
+```
+
+
+```{r}
+
+# After cleaning, reordering, recoding all variable, a new version of data was created which filters out the top-coded respondents. Later I will use the unfiltered dataset to check whether adding the top-coded respondents would change my analyses. This version has 6881 obsevations, which means the difference between these two data sets is 143 respondents.
+
+nlsydata4 <- mutate(filter(nlsydata3, 
+       income.topcoded == "Not topcoded") %>%
+  select(everything()))
+
+```
+
+
+
+### **(1)** Data Summary
+
+After initial data exploration, I decided to categorize the variables into the following groups:
+
+* Childhood Upbringing:
+  + `us.born`
+  + `usborn.south`
+  + `multilingual`
+  + `language`
+  + `age14.urban`
+  + `christian`
+  + `religion`
+  + `police.frisk`
+  + `age.1stfrisk` (numeric)
+
+
+* Geographical: 
+  + `us.region`
+  + `urban.residence`
+
+* Ethnicity and Social Status: 
+  + `race`
+  + `poverty1979`
+  + `poverty1990`
+  + `poverty2000`
+
+* Marriage and Family Planning: 
+  + `marital.status1979`
+  + `familysize1979` (numeric)
+  + `nonbio.children` (numeric)
+  + `age.nonbiokid` (numeric)
+  + `number.children`  (numeric)
+  + `familysize2000`  (numeric)
+  + `household.income1999`  (numeric)
+  + `maritalc.status2000` 
+  + `marital.status2000`
+  + `months.marryto1stkid`
+  + `familysize2012` (numeric)
+
+* Spouse:
+  + `spouse.occupation2000`
+  + `spouse.workhours2000` (numeric)
+  + `partner.birthyear`
+  + `spouse.occupation2012`
+  + `spouse.workhours2012` (numeric)
+  + `spouse.income2012` (numeric)
+  + `age.spouse` (numeric)
+
+* Education:
+  + `education1979`
+  + `education1990`
+  + `education2012`
+  + `exp.edu1979`
+  + `edu.completedin1990`
+  + `edu.completedin2012`
+
+* Work Experience, Ambitions, Income: 
+  + `veteran` 
+  + `ideal.occupation`
+  + `schoolin5years`
+  + `income1990` (numeric)
+  + `jobsheld.1990` (numeric)
+  + `industry2000`
+  + `occupation2000`
+  + `income2000` (numeric)
+  + `industry2012`
+  + `occupation2012`
+  + `jobs.held2012` (numeric)
+
+* Values: 
+  + `fa.womenathome`
+  + `fa.notimetowork` 
+  + `fa.proworkwife`
+  + `fa.badchildren`
+  + `fa.genderrole`
+  + `fa.menhousework`
+  + `fa.happytradrole`
+
+* Criminal History and Substance Use:
+  + `crime.charge`
+  + `age.1stalcohol`  (numeric)
+  + `marijuana`
+  + `age.1stmarijuana` (numeric)
+  + `cocaine1990`
+  + `age.1stcocaine` (numeric)
+  + `alcohol.dailyconsume` (numeric)
+
+`gender`, `income2012`, and `income.topcoded` are not in any of the categories above.
+
+The assumption is that the variables within each group are similar to each other and have high covariate because they are getting at the same information. That is, the variables in the Childhood Upbringing category might help describe the affect of the respondent's childhood on his/her future income. Every variable is presented in a way to see if men and women are treated differently, and if that difference has an effect of their income. This helps us see if the income gap between men and women is correlated with a specific aspect of their life experiences. 
+
+In this section, I will compare the variables within each group to see which best explains the difference in income between men and women. In the next section, I will choose a subset of these variables for a linear regression analysis.
+
+
+```{r}
+# Start by discussing the variables of interest and my reasons for choosing these variables.
+
+# Display tabular summaries of means and proportions where appropriate
+
+# tabular summaries should break things down by gender
+
+# Your score for this section will be based on the following criteria:
+
+  #Meaningful variable names, factor variables, and factor level names
+
+  #Insightful graphical and tabular summaries of the data
+
+  #Proper labelling of figure axes and table columns
+
+  # Discussion of the graphical and tabular summaries.
+
+```
+
+**(a)** Childhood Uprbringing
+```{r}
+gendergap.usborn <- nlsydata4 %>% 
+  filter(!is.na(us.born)) %>% 
+  group_by(us.born) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.usborn
+
+ggplot(data = gendergap.usborn, aes(x = us.born, y = income.gap, fill = us.born)) + geom_bar(stat = "identity") + xlab("Country of birth") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by country of birth") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.usbornsouth <- nlsydata4 %>% 
+  filter(!is.na(usborn.south)) %>% 
+  group_by(usborn.south) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.usbornsouth
+
+ggplot(data = gendergap.usbornsouth, aes(x = usborn.south, y = income.gap, fill = usborn.south)) + geom_bar(stat = "identity") + xlab("Birthplace in US") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by birthplace in US") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.multilingual <- nlsydata4 %>% 
+  filter(!is.na(multilingual)) %>% 
+  group_by(multilingual) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.multilingual
+
+ggplot(data = gendergap.multilingual, aes(x = multilingual, y = income.gap, fill = multilingual)) + geom_bar(stat = "identity") + xlab("Language Spoken at Home") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by language spoken at home") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.language <- nlsydata4 %>% 
+  filter(!is.na(language)) %>% 
+  group_by(language) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.language
+
+ggplot(data = gendergap.language, aes(x = language, y = income.gap, fill = language)) + geom_bar(stat = "identity") + xlab("Language Spoken at Home") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by language spoken at home") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.age14urban <- nlsydata4 %>% 
+  filter(!is.na(age14.urban)) %>% 
+  group_by(age14.urban) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.age14urban
+
+ggplot(data = gendergap.age14urban, aes(x = age14.urban, y = income.gap, fill = age14.urban)) + geom_bar(stat = "identity") + xlab("Environment at Age 14") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by environment at age 14") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.religion <- nlsydata4 %>% 
+  filter(!is.na(religion)) %>% 
+  group_by(religion) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.religion
+
+ggplot(data = gendergap.religion, aes(x = religion, y = income.gap, fill = religion)) + geom_bar(stat = "identity") + xlab("Religion") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by religion") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+gendergap.christian <- nlsydata4 %>% 
+  filter(!is.na(christian)) %>% 
+  group_by(christian) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.christian
+
+ggplot(data = gendergap.christian, aes(x = christian, y = income.gap, fill = christian)) + geom_bar(stat = "identity") + xlab("Religion") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by religion") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+```{r}
+gendergap.policefrisk <- nlsydata4 %>% 
+  filter(!is.na(police.frisk)) %>% 
+  group_by(police.frisk) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.policefrisk
+
+ggplot(data = gendergap.policefrisk, aes(x = police.frisk, y = income.gap, fill = police.frisk)) + geom_bar(stat = "identity") + xlab("Experience with being stopped by police") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by contact with law enforcement") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+
+gendergap.age1stfrisk <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = age.1stfrisk, y = income2012, color = gender)) + xlab("Age when first Stop and Frisk was experienced") + ylab("Income ($)") + ggtitle("Relationship between age of first frisk and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = age.1stfrisk, y = income2012, color = gender))
+
+gendergap.age1stfrisk
+
+```
+
+
+**(b)** Geographical
+```{r}
+gendergap.usregion <- nlsydata4 %>% 
+  filter(!is.na(us.region)) %>% 
+  group_by(us.region) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.usregion
+
+ggplot(data = gendergap.usregion, aes(x = us.region, y = income.gap, fill = us.region)) + geom_bar(stat = "identity") + xlab("Region of US") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by Region in US") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.urbanresidence <- nlsydata4 %>% 
+  filter(!is.na(urban.residence)) %>% 
+  group_by(urban.residence) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.urbanresidence
+
+ggplot(data = gendergap.urbanresidence, aes(x = urban.residence, y = income.gap, fill = urban.residence)) + geom_bar(stat = "identity") + xlab("Environment") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by environment") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+**(c)** Ethnicity and social status
+
+```{r}
+gendergap.race <- nlsydata4 %>%
+  filter(!is.na(race)) %>% 
+  group_by(race) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.race
+
+ggplot(data = gendergap.race, aes(x = race, y = income.gap, fill = race)) + geom_bar(stat = "identity") + xlab("Race") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by race") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.poverty1979 <- nlsydata4 %>% 
+  filter(!is.na(poverty1979)) %>% 
+  group_by(poverty1979) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.poverty1979
+
+ggplot(data = gendergap.poverty1979, aes(x = poverty1979, y = income.gap, fill = poverty1979)) + geom_bar(stat = "identity") + xlab("Poverty Level in 1979") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by poverty level in 1979") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.poverty1990 <- nlsydata4 %>% 
+  filter(!is.na(poverty1990)) %>% 
+  group_by(poverty1990) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.poverty1990
+
+ggplot(data = gendergap.poverty1990, aes(x = poverty1990, y = income.gap, fill = poverty1990)) + geom_bar(stat = "identity") + xlab("Poverty Level in 1990") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by poverty level in 1990") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.poverty2000 <- nlsydata4 %>% 
+  filter(!is.na(poverty2000)) %>% 
+  group_by(poverty2000) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.poverty2000
+
+ggplot(data = gendergap.poverty2000, aes(x = poverty2000, y = income.gap, fill = poverty2000)) + geom_bar(stat = "identity") + xlab("Poverty Level in 2000") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by poverty level in 2000") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+**(d)** Marriage and Family Planning
+
+
+```{r}
+
+gendergap.maritalstatus1979 <-
+ggplot(nlsydata4, aes(marital.status1979, fill = gender)) + geom_bar(position = 'dodge') + xlab("Marital Status in 1979") + ylab("Number of people") + ggtitle("Marital Status in 1979, by gender") + guides(fill = FALSE)
+
+gendergap.maritalstatus1979
+
+```
+Most respondents were too young to be married in 1979. There were not enough data points in categories other than never married to get a meaningful data visualization of the income gap. The same problem applies to family size in 1979, in 2000 and 2012. There are not enough data at each level to see the difference in income between men and women, even when we treat family size and number of children as categorical variables.
+
+```{r}
+
+gendergap.familysize1979 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = familysize1979, y = income2012, color = gender)) + xlab("Family size in 1979") + ylab("Income ($)") + ggtitle("Relationship between family size in 1979 and respondent's income") + guides(fill = FALSE)  + geom_smooth(mapping = aes(x = familysize1979, y = income2012, color = gender))
+
+gendergap.familysize1979
+
+```
+
+There are not enough observations to put a smooth line on adopted and step children graph.
+```{r}
+
+gendergap.nonbiochildren <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = nonbio.children, y = income2012, color = gender)) + xlab("Number of adopted and step children") + ylab("Income ($)") + ggtitle("Relationship between Number of non-biological children and respondent's income") + guides(fill = FALSE)  
+
+gendergap.nonbiochildren
+
+```
+
+
+```{r}
+
+gendergap.numberchildren <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = number.children, y = income2012, color = gender)) + xlab("Number of biological children") + ylab("Income ($)") + ggtitle("Relationship between Number of biological children in and respondent's income") + guides(fill = FALSE)  + geom_smooth(mapping = aes(x = number.children, y = income2012, color = gender))
+
+gendergap.numberchildren
+
+```
+
+
+```{r}
+
+gendergap.familysize2000 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = familysize2000, y = income2012, color = gender)) + xlab("Family size in 2000") + ylab("Income ($)") + ggtitle("Relationship between Family Size in 2000 and respondent's income") + guides(fill = FALSE)  + geom_smooth(mapping = aes(x = familysize2000, y = income2012, color = gender))
+
+gendergap.familysize2000
+
+```
+
+
+```{r}
+
+gendergap.householdincome1999 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = household.income1999, y = income2012, color = gender)) + xlab("Household income in 1999 ($)") + ylab("Income ($)") + ggtitle("Relationship between household income in 1999 and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = household.income1999, y = income2012, color = gender))
+
+gendergap.householdincome1999
+
+```
+
+```{r}
+gendergap.maritalstatus2000 <- nlsydata4 %>% 
+  filter(!is.na(marital.status2000)) %>% 
+  group_by(marital.status2000) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.maritalstatus2000
+
+ggplot(data = gendergap.maritalstatus2000, aes(x = marital.status2000, y = income.gap, fill = marital.status2000)) + geom_bar(stat = "identity") + xlab("Marital Status in 2000") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by marital status in 2000") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.maritalcstatus2000 <- nlsydata4 %>% 
+  filter(!is.na(maritalc.status2000)) %>% 
+  group_by(maritalc.status2000) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.maritalcstatus2000
+
+ggplot(data = gendergap.maritalcstatus2000, aes(x = maritalc.status2000, y = income.gap, fill = maritalc.status2000)) + geom_bar(stat = "identity") + xlab("Marital Status in 2000") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by marital status in 2000") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.marrytofirstkid <- nlsydata4 %>% 
+  filter(!is.na(months.marryto1stkid)) %>% 
+  group_by(months.marryto1stkid) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.marrytofirstkid
+
+ggplot(data = gendergap.marrytofirstkid, aes(x = months.marryto1stkid, y = income.gap, fill = months.marryto1stkid)) + geom_bar(stat = "identity") + xlab("Time elapsed between marriage and first born child") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by how how soon couples have children after marriage") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+
+gendergap.familysize2012 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = familysize2012, y = income2012, color = gender)) + xlab("Family size in 2012") + ylab("Income ($)") + ggtitle("Relationship between Family Size in 2012 and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = familysize2012, y = income2012, color = gender))
+
+gendergap.familysize2012
+
+```
+
+**(e)** Spouse
+
+```{r}
+gendergap.spouseoccupation2000 <- ggplot(nlsydata4, aes(x = as.factor(spouse.occupation2000), y = income2012)) +
+  xlab("Spouse's Occupation in 2000") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.spouseoccupation2000
+```
+
+```{r}
+gendergap.spouseoccupation2012 <- ggplot(nlsydata4, aes(x = as.factor(spouse.occupation2012), y = income2012)) +
+  xlab("Spouse's Occupation in 2012") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.spouseoccupation2012
+```
+
+```{r}
+
+gendergap.spouseincome2012 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = spouse.income2012, y = income2012, color = gender)) + xlab("Spouse's income in 2012 ($)") + ylab("Income ($)") + ggtitle("Relationship between spouse's income and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = spouse.income2012, y = income2012, color = gender))
+
+gendergap.spouseincome2012
+
+```
+
+
+
+```{r}
+
+gendergap.spouseworkhours2000 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = spouse.workhours2000, y = income2012, color = gender)) + xlab("Average number of hours the respondent's spouse works in yr 2000") + ylab("Income ($)") + ggtitle("Relationship between spouse's work hours in year 2000 and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = spouse.workhours2000, y = income2012, color = gender))
+
+gendergap.spouseworkhours2000
+
+```
+
+
+```{r}
+
+gendergap.spouseworkhours2012 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = spouse.workhours2012, y = income2012, color = gender)) + xlab("Average number of hours the respondent's spouse works in 2012") + ylab("Income ($)") + ggtitle("Relationship between spouse's work hours and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = spouse.workhours2012, y = income2012, color = gender))
+
+gendergap.spouseworkhours2012
+
+```
+
+```{r}
+
+gendergap.agespouse <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = age.spouse, y = income2012, color = gender)) + xlab("Age of spouse in 2012") + ylab("Income ($)") + ggtitle("Relationship between spouse's age and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = age.spouse, y = income2012, color = gender))
+
+gendergap.agespouse
+
+```
+
+**(f)** Education
+
+```{r}
+gendergap.education1979 <- ggplot(nlsydata4, aes(x = as.factor(education1979), y = income2012)) +
+  xlab("Expected Education Attainment in 1979") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education1979
+```
+
+
+```{r}
+gendergap.education1979att <- ggplot(nlsydata4, aes(x = as.factor(exp.edu1979), y = income2012)) +
+  xlab("Expected Education Attainment in 1979") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education1979att
+```
+
+
+```{r}
+gendergap.education1990 <- ggplot(nlsydata4, aes(x = as.factor(education1990), y = income2012)) +
+  xlab("Education completed in 1990") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education1990
+```
+
+```{r}
+gendergap.education1990c <- ggplot(nlsydata4, aes(x = as.factor(edu.completedin1990), y = income2012)) +
+  xlab("Education completed in 1990") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education1990c
+```
+
+
+```{r}
+gendergap.education2012 <- ggplot(nlsydata4, aes(x = as.factor(education2012), y = income2012)) +
+  xlab("Education completed in 2012") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education2012
+```
+
+
+```{r}
+gendergap.education2012c <- ggplot(nlsydata4, aes(x = as.factor(edu.completedin2012), y = income2012)) +
+  xlab("Education completed in 2012") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.education2012c
+```
+
+**(g)** Work Experience, Ambitions, Income
+
+```{r}
+gendergap.veteran <- nlsydata4 %>% 
+  filter(!is.na(veteran)) %>% 
+  group_by(veteran) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.veteran
+
+ggplot(data = gendergap.veteran, aes(x = veteran, y = income.gap, fill = veteran)) + geom_bar(stat = "identity") + xlab("Having served in the military in the past") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by veteran status") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+```{r}
+gendergap.idealoccupation <- ggplot(nlsydata4, aes(x = as.factor(ideal.occupation), y = income2012)) +
+  xlab("Ideal occupation at age 35") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.idealoccupation
+```
+
+```{r}
+gendergap.schoolin5year <- nlsydata4 %>% 
+  filter(!is.na(schoolin5years)) %>% 
+  group_by(schoolin5years) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.schoolin5year
+
+ggplot(data = gendergap.schoolin5year, aes(x = schoolin5years, y = income.gap, fill = schoolin5years)) + geom_bar(stat = "identity") + xlab("Expectation to be in school in 5 years") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by inclination for education") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+gendergap.industry2000 <- ggplot(nlsydata4, aes(x = as.factor(industry2000), y = income2012)) +
+  xlab("Industry in year 2000") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.industry2000
+```
+
+```{r}
+gendergap.occupation2000 <- ggplot(nlsydata4, aes(x = as.factor(occupation2000), y = income2012)) +
+  xlab("Occupation in 2000") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.occupation2000
+```
+
+```{r}
+gendergap.occupation2012 <- ggplot(nlsydata4, aes(x = as.factor(occupation2012), y = income2012)) +
+  xlab("Occupation in 2012") +
+  ylab("income") +  geom_boxplot(aes(fill = gender)) +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1)) 
+
+gendergap.occupation2012
+```
+
+```{r}
+
+gendergap.income1990 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = income1990, y = income2012, color = gender)) + xlab("Respondent income in 1990") + ylab("Income ($)") + ggtitle("Relationship between 1990 income and respondent's income in 2012") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = income1990, y = income2012, color = gender))
+
+gendergap.income1990
+
+```
+
+```{r}
+
+gendergap.income2000 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = income2000, y = income2012, color = gender)) + xlab("Respondent income in 2000") + ylab("Income ($)") + ggtitle("Relationship between 2000 income and respondent's income in 2012") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = income2000, y = income2012, color = gender))
+
+gendergap.income2000
+
+```
+
+
+```{r}
+
+gendergap.jobsheld1990 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = jobs.held1990, y = income2012, color = gender)) + xlab("Number of jobs held in 1990") + ylab("Income ($)") + ggtitle("Relationship between number of jobs held in 1990 and respondent's income in 2012") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = jobs.held1990, y = income2012, color = gender))
+
+gendergap.jobsheld1990
+
+```
+
+```{r}
+
+gendergap.jobsheld2012 <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = jobs.held2012, y = income2012, color = gender)) + xlab("Total of jobs held in past (2012)") + ylab("Income ($)") + ggtitle("Relationship between number of jobs held and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = jobs.held2012, y = income2012, color = gender))
+
+gendergap.jobsheld2012
+
+```
+
+**(h)** Values
+
+```{r}
+gendergap.fawomenathome <- nlsydata4 %>% 
+  filter(!is.na(fa.womenathome)) %>% 
+  group_by(fa.womenathome) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.fawomenathome
+
+ggplot(data = gendergap.fawomenathome, aes(x = fa.womenathome, y = income.gap, fill = fa.womenathome)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Women's place is in the home?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.fanotimetowork <- nlsydata4 %>% 
+  filter(!is.na(fa.notimetowork)) %>% 
+  group_by(fa.notimetowork) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.fanotimetowork
+
+ggplot(data = gendergap.fanotimetowork, aes(x = fa.notimetowork, y = income.gap, fill = fa.notimetowork)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Wife with family has no time for other employment?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+
+```{r}
+gendergap.faproworkwife <- nlsydata4 %>% 
+  filter(!is.na(fa.proworkwife)) %>% 
+  group_by(fa.proworkwife) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.faproworkwife
+
+ggplot(data = gendergap.faproworkwife, aes(x = fa.proworkwife, y = income.gap, fill = fa.proworkwife)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Disagree that working wife is more useful?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+gendergap.fabadchildren <- nlsydata4 %>% 
+  filter(!is.na(fa.badchildren)) %>% 
+  group_by(fa.badchildren) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.fabadchildren
+
+ggplot(data = gendergap.fabadchildren, aes(x = fa.badchildren, y = income.gap, fill = fa.badchildren)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Employment of wives leads to juvenile delinquency?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.fagenderrole <- nlsydata4 %>% 
+  filter(!is.na(fa.genderrole)) %>% 
+  group_by(fa.genderrole) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.fagenderrole
+
+ggplot(data = gendergap.fagenderrole, aes(x = fa.genderrole, y = income.gap, fill = fa.genderrole)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Is it better if man is the achiever outside the home and the woman takes care of the family?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.famenhousework <- nlsydata4 %>% 
+  filter(!is.na(fa.menhousework)) %>% 
+  group_by(fa.menhousework) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.famenhousework
+
+ggplot(data = gendergap.famenhousework, aes(x = fa.menhousework, y = income.gap, fill = fa.menhousework)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Men should share housework?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+gendergap.fahappytradrole <- nlsydata4 %>% 
+  filter(!is.na(fa.happytradrole)) %>% 
+  group_by(fa.happytradrole) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.fahappytradrole
+
+ggplot(data = gendergap.fahappytradrole, aes(x = fa.happytradrole, y = income.gap, fill = fa.happytradrole)) + geom_bar(stat = "identity") + xlab("Level of misogyny (low to high)") + ylab("Income gap ($)") + ggtitle("Women are happier in traditional roles?") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+**(i)** Criminal History and Substance Use
+
+```{r}
+gendergap.crimecharge <- nlsydata4 %>% 
+  filter(!is.na(crime.charge)) %>% 
+  group_by(crime.charge) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.crimecharge
+
+ggplot(data = gendergap.crimecharge, aes(x = crime.charge, y = income.gap, fill = crime.charge)) + geom_bar(stat = "identity") + xlab("Criminal History") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by criminal history") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+```{r}
+
+gendergap.age1stalcohol <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = age.1stalcohol, y = income2012, color = gender)) + xlab("Age when first tried alcohol") + ylab("Income ($)") + ggtitle("Relationship between age first tried alcohol and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = age.1stalcohol, y = income2012, color = gender))
+
+gendergap.age1stalcohol
+
+```
+
+```{r}
+gendergap.marijuana <- nlsydata4 %>% 
+  filter(!is.na(marijuana)) %>% 
+  group_by(marijuana) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.marijuana
+
+ggplot(data = gendergap.marijuana, aes(x = marijuana, y = income.gap, fill = marijuana)) + geom_bar(stat = "identity") + xlab("Marijuana Use") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by marijuana use") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12))
+```
+
+
+```{r}
+
+gendergap.age1stmarijuana <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = age.1stmarijuana, y = income2012, color = gender)) + xlab("Age when first tried marijuana") + ylab("Income ($)") + ggtitle("Relationship between age first tried marijuana and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = age.1stmarijuana, y = income2012, color = gender))
+
+gendergap.age1stmarijuana
+
+```
+
+```{r}
+gendergap.cocaine1990 <- nlsydata4 %>% 
+  filter(!is.na(cocaine1990)) %>% 
+  group_by(cocaine1990) %>%
+  summarize(income.gap = mean(income2012[gender == "Male"], na.rm = TRUE) - mean(income2012[gender == "Female"], na.rm = TRUE), upper = t.test(income2012 ~ gender)$conf.int[1], lower = t.test(income2012 ~ gender)$conf.int[2],  is.significant = as.numeric(t.test(income2012 ~ gender)$p.value < 0.05))
+
+gendergap.cocaine1990
+
+ggplot(data = gendergap.cocaine1990, aes(x = cocaine1990, y = income.gap, fill = cocaine1990)) + geom_bar(stat = "identity") + xlab("Cocaine Use") + ylab("Income gap ($)") + ggtitle("Income gap between men and women, by cocaine use") + guides(fill = FALSE) + geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) + theme(text = element_text(size = 12)) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+
+gendergap.age1stcocaine <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = age.1stcocaine, y = income2012, color = gender)) + xlab("Age when first tried cocaine") + ylab("Income ($)") + ggtitle("Relationship between age first tried cocaine and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = age.1stcocaine, y = income2012, color = gender))
+
+gendergap.age1stcocaine
+
+```
+
+```{r}
+
+gendergap.alcoholdailyconsume <- 
+ggplot(data = nlsydata4) + 
+  geom_point(mapping = aes(x = alcohol.dailyconsume, y = income2012, color = gender)) + xlab("Number of alcohol consumed a day") + ylab("Income ($)") + ggtitle("Relationship between average daily alcohol consumption and respondent's income") + guides(fill = FALSE) + geom_smooth(mapping = aes(x = alcohol.dailyconsume, y = income2012, color = gender))
+
+gendergap.alcoholdailyconsume
+```
+
+### **(2)** Methodology
+
+Initially, I had planned on choosing a variable from each of the categories above to represent an aspect of the respondent's life experience that may contribute to their future income. However, after looking at the data, I decided that some of these variables are not candidates for the regression analysis because (1) the data suggests the are not related to the outcome variable (respondent's income in 2012) and (2) they do seem to contribute to a difference in income between men and women that have the same characteristics. The following 7 variables were chosen for the regression analsyis:
+
+* race (`race`)
+* childhood poverty (`poverty1990`)
+* recent marital status (`maritalc.status2000`)
+* early career income (`income1990`)
+* spouse's work (`spouse.workhours2012`)
+* education level (`edu.completedin2012`)
+
+The missing values were coded as NA and were left out of the analysis. This led to sometimes having too few data points, or an highly unequal proportion of men or women to have meaningful analyse of the data using t-tests. Since we are limiting ourselves to respondents who have recorded values for their 2012 income, many were too young to have participated in the survey in 1979. Therefore, there were more missing values from the earlier survey questions. This led me to select variables from more recent years (1990 onwards), which have fewer missing values. 
+
+To address the problem with the top-coded values, I created two identical data sets that are different only in their inclusion/exclusion of the top-coded 143 respondents. My approach is to first do the exploratory analyses of each variable's relationship to the 2012 income outcome variable without the top-coded incomes (which are outliers since they are the top 2% and part of the long right tail), and then test the regression model with both data sets to check for differences in fit. 
+
+There were table plots that I created which I thought would reveal interesting trends but dit not. The most notable was the data on number of children. Plotting the number of children in 2000 against income 2012 revealed a strong negative relationship. The trend shows that an increase in number of children leads to decrease in income. This would have been interesting if men were asked the same question. Due to the survey design, only women were asked about the number of biological children they have. Even though men have biological children too, they were not asked this question. This is a flaw in the survey design. The lack of data from male respondents meant I could not do an analysis of the difference in income between men and women who have the same number of children, to see if that contributes to an the income gap.
+
+There were several relationships I investigated that do not appear in my findings section. One example is the relationship between religion and income. The variable `christian` which shows a statistically significant difference in the gender income gaps between Christians and Roman Catholics. The data suggested that men and women who are Roman Catholic experience a larger difference in income than Christians. This analysis was not used because it's from the earlier survey version in 1979. I did not feel confident to assume that people's religious believes from their childhood have strong effects on their future income, as people do change their religious beliefs over time.
+
+### **(3)** Findings
+
+```{r}
+# Presentation of your main findings concerning the main problem of income (in)equality between men and women
+
+
+# You should provide, where appropriate:
+
+  #Tabular summaries (with carefully labelled column headers)
+
+  #Graphical summaries (with carefully labelled axes, titles, and legends)
+
+  #Regression output + interpretation of output + interpretation of coefficients
+
+
+  #Assessments of statistical significance (output of tests, models, and corresponding p-values)
+
+
+#As part of your analysis you must run a regression model. When running regressions, you should discuss whether the standard diagnostic plots indicate issues with the model (trends in residuals, variance issues, outliers, etc.). You will not receive full credit for your regression unless you clearly display and discuss the diagnostic plots.
+
+```
+
+The variables `gender`, `race`, `poverty level in 2000`, `income in 1990`, `marital status in 2000`, and `number of hours spouse worked in 2012` were used to regressed against income.
+
+```{r}
+
+gendergap.lm1 <- lm(income2012 ~ gender*race + poverty1990 + income1990 + maritalc.status2000 + spouse.workhours2012, data = nlsydata4)
+
+kable((summary(gendergap.lm1))$coef, 
+      digits = c(3, 3, 3, 4), format = 'markdown')
+```
+Based on the p-values shown, it looks like `gender`, `income1990` (the respondent's income in 1990), and `race` are statistically significant predictors of  income in 2012. Gender and race are negative coefficients. Income in 1990 id s positive coefficient. This means being female and being black are negatively associated with income, while having income in 1990 is positively associated with income in 2012.
+
+**Plot Diagnostics**
+
+Let's take a look at the plot diagnostics.
+```{r}
+plot(gendergap.lm1)
+
+```
+
+**Residuals vs Fitted**
+
+This plot suggests non-linearity. There is a straight downward sloping line, which is expected because there is no negative income. Variance appears to increase with fitted values.
+
+**Normal Q-Q**
+
+This plot appears somewhat normal, with heavy upper tail thatn what is expected under noramlity. This could be due to the non-constant variance that is present in the residuals vs fitted plot above.
+
+**Scale Location Plot**
+There is an increasing trend in residual variance, which is indicated by the upward sloping red line. There is also a clear straight line of riduals which could be due to the 1990 income variable.
+
+**Residual vs Leverage**
+There are no clear outliers in the upper right or lower right.
+
+
+Check if this looks the same with top-coded data.
+
+```{r}
+
+gendergap.lm2 <- lm(income2012 ~ gender*race + poverty1990 + income1990 + maritalc.status2000 + spouse.workhours2012, data = nlsydata3)
+
+kable((summary(gendergap.lm1))$coef, 
+      digits = c(3, 3, 3, 4), format = 'markdown')
+```
+
+This looks pretty similar to the output without top-coded data. The variables `gender`, `race` and `income1990` are significant.
+
+**Interpretations**
+
+It does not look like linear regression is the right model for explaining how these variables are related to income. Looking at the coefficients that are significant:
+
+> On average, holding other things equal, being female is associated with $34,560.32 decrease in annual income.
+
+```{r}
+# Provide an overview of the approach you took to exploring and analyzing the data
+
+# Use this section as a place to explain the various types of analyses that you tried
+
+# This is where you tell the story of how you got to your main findings.
+
+# You should address at least the following questions:
+
+  #How did you deal with missing values? What impact does your approach have on the interpretation or generalizability of the resulting analysis?
+
+  #How did you deal with topcoded variables? What impact does your approach have on the interpretation or generalizability of the resulting analysis?
+
+  #Did you produce any tables or plots that you thought would reveal interesting trends but didn’t?
+
+  #What relationships did you investigate that don’t appear in your findings section?
+
+  #What’s the analysis that you finally settled on? What income and gender related factors do you investigate in the final analysis?
+
+```
+
+
+### **(4)** Discussion
+
+This project has been fun and sobering at the same time. A difference in income between men and women is observed even when you hold many other factors constant. Some factors like childhood poverty, race, and one's early career income are associated with the widening of this gap. One potential confounding factor is the 1990 income. I had assumed that income from 1990 respresented early career income, though it is possible that for those respondents who have had the same job from 1990 to 2012, it is the same data point. 
+
+There are many limitations to this project. A log transform of the income variable could have yielded a better fitted regression. But while the regression analysis shows how gender (being female) is negatively associated with income earnings, it does not explain why there is a difference in men and women's income.
+
+Overall, I do not have high confidence in my analyses. Due to time constraint, I did not have the chance to fully explore the data and try more combinations of variables for the regression model. I do not currently feel confident enough in my analysis to present it to policy makers.
+
+```{r}
+# In this section you should summarize your main conclusions.
+
+# You should also discuss potential limitations of your analysis and findings.
+
+#Are there potential confounders that you didn’t control for? Are the models you fit believable?
+
+
+#You should also address the following question: How much confidence do you have in your analysis? Do you believe your conclusions? Are you confident enough in your analysis and findings to present them to policy makers? (You will not be deducted points for saying that you are unsure of your analysis. This is just something I want you to reflect upon.)
+
+```
+
+### **(5)** Acknowledgement
+
+I relied heavily on Professor Alexandra Chouldechova's lecture notes for completing this project. In addition, I am thankful for the discussions with Kayla Reiman, who helped me figure out several debugging issues.
